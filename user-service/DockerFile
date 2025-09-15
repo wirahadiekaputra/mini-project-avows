@@ -1,0 +1,16 @@
+# Use a specific Java version
+FROM openjdk:17-slim
+
+# Set a working directory inside the container
+WORKDIR /app
+
+# The path here MUST match the path to your JAR file after you build it.
+# Check your 'target' directory. Is the name correct?
+COPY target/user-service-0.0.1-SNAPSHOT.jar app.jar
+
+# Expose the port the application runs on (inside the container)
+# Spring Boot defaults to 8080; ensure container uses 8080 so docker-compose port mapping works
+EXPOSE 8080
+
+# This is the command to run your application
+ENTRYPOINT ["java", "-jar", "app.jar"]

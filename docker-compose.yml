@@ -1,0 +1,95 @@
+services:
+  postgres-user:
+    image: postgres:15
+    container_name: USER_SERVICE_DB
+    environment:
+      - POSTGRES_DB=USER_SERVICE
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123
+    ports:
+      - "5433:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+      - ./query/user-service-init.sql:/docker-entrypoint-initdb.d/user-service-init.sql:ro
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-order:
+    image: postgres:15
+    container_name: ORDER_SERVICE_DB
+    environment:
+      - POSTGRES_DB=ORDER_SERVICE
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123
+    ports:
+      - "5434:5432"
+    volumes:
+      - order-db-data:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: DockerFile
+    ports:
+      - "8081:8080" 
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/USER_SERVICE
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=123
+      - SPRING_FLYWAY_ENABLED=false
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+      - LOGGING_LEVEL_ORG_HIBERNATE=DEBUG
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: on-failure
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: DockerFile
+    ports:
+      - "8082:8080" 
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/ORDER_SERVICE
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=123
+      - SPRING_FLYWAY_ENABLED=false
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info
+      - USER_SERVICE_URL=http://user-service:8080/v1/users
+    networks: 
+      - microservices-net
+    healthcheck: 
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: on-failure
+
+volumes:
+  user-db-data:
+  order-db-data:
+
+networks:
+  microservices-net:
+    driver: bridge
